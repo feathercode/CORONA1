@@ -8,15 +8,25 @@ library(gridExtra) # for side-by-side ggplots
 
 # ??? dyn.load("xf_filter_bworth1_d_R.so")
 
-s1="https://opendata.ecdc.europa.eu/covid19/casedistribution/csv"
-s2=list.files(pattern="covid_2020*")
-s3=tail(s2,1)
-
 # rolling average function
 f_rolling <- function(x,n){filter(x, rep(1/(1*n),1*n), sides=2)}
 
+
+# download and rename the latest data (based on most recent dateRep value) 
+s1="https://opendata.ecdc.europa.eu/covid19/casedistribution/csv"
+tempfile="corona_temp.csv"
+download.file(s1,tempfile)
+dftemp <- read.csv(file=tempfile,nrows=1,header=T)
+outfile= paste("corona_",gsub('-','',as.character(as.Date(dftemp$dateRep[1],"%d/%m/%Y"))),".csv",sep="")
+file.rename(tempfile,outfile)
+# make list of potential local sources (s2)  and selected source (s3, the most recent dataset)
+s2=list.files(pattern=glob2rx("corona_*.csv"))
+s3=tail(s2,1)
+
+
 ################################################################################
 # User interface
+# - not including the variable selection (country) controls, which are in the server-section
 ################################################################################
 ui <- dashboardPage(
   dashboardHeader(
@@ -26,7 +36,7 @@ ui <- dashboardPage(
     width = 300,
     sidebarMenu(
       style = "position: fixed; overflow: visible;",
-      selectInput("setsource", "Pick a data source",c(s1,s2), selected=s3),
+      selectInput("setsource", "Pick a data source",c(s1,s2),selected=s3),
       selectInput("setmindeath", "Min.cumulative deaths",c(0,1,5,10,100),selected=5),
       sliderInput("setmaxweeks", "Max. weeks to display",0,52,0),
       radioButtons("setsmooth","Smoothing",c("Raw data"="no","RollingAverage"="yes1","Butterworth Filter"="yes2"),selected="no"),
@@ -39,6 +49,7 @@ ui <- dashboardPage(
     h4('File Preview',align="center"), 
     tableOutput("preview1"),
     tableOutput("preview2"),
+    tableOutput("preview3"),
     h4('Cases Versus Deaths',align="center"),
     plotOutput("plot1"),
     plotOutput("plot2")
@@ -73,6 +84,8 @@ server <- function(input, output, session) {
   })
 
 
+  
+  
   # create variable-selection controls on-the-fly with renderUI
   output$newcontrols <- renderUI({
     a= df0()$Country
@@ -175,10 +188,10 @@ server <- function(input, output, session) {
   
   # data preview #################################################################
   output$preview1 <- renderTable({
-    tail(subset(df1(),select= c(Country,dateRep,Cases,Deaths,DeathsSum)),5)
+    tail(subset(df1(),select= c(Country,dateRep,Cases,Deaths,DeathsSum)),3)
   })
   output$preview2 <- renderTable({
-    tail(subset(df2(),select= c(Country,dateRep,Cases,Deaths,DeathsSum)),5)
+    tail(subset(df2(),select= c(Country,dateRep,Cases,Deaths,DeathsSum)),3)
   })
   
   
@@ -214,7 +227,7 @@ server <- function(input, output, session) {
       ggtitle(setcountry) +
       o1 + o2 + o3 + o4 
     
-    return(grid.arrange(p1,p2,ncol=2))
+    return(grid.arrange(p1,p2,ncol=1))
   })
   
 
