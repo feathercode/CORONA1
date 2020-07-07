@@ -3,12 +3,13 @@ library(shinydashboard) # to enable a fixed sidebar
 library(seewave) # for filtering 
 library(ggplot2) # for better plots
 library(viridis) # for better colours
-library(zoo) # for interpolation
+library(zoo) # for interpolation and rolling averages
+library(RcppRoll) # alternative for rolling averages - includes median estimates and sum
 library(gridExtra) # for side-by-side ggplots
 
 # ??? dyn.load("xf_filter_bworth1_d_R.so")
 
-# rolling average function
+# rolling average function (currently unused)
 f_rolling <- function(x,n){filter(x, rep(1/(1*n),1*n), sides=2)}
 
 
@@ -51,7 +52,8 @@ ui <- dashboardPage(
     tableOutput("preview2"),
     tableOutput("preview3"),
     h4('Cases Versus Deaths',align="center"),
-    plotOutput("plot1"),
+    plotOutput("plot1",height=800),
+    h4('Extra plots (unused)',align="center"),
     plotOutput("plot2")
   )
 )
@@ -84,8 +86,7 @@ server <- function(input, output, session) {
   })
 
 
-  
-  
+
   # create variable-selection controls on-the-fly with renderUI
   output$newcontrols <- renderUI({
     a= df0()$Country
@@ -115,8 +116,8 @@ server <- function(input, output, session) {
     z=nrow(dfx) # determine the current number of rows
     # apply smoothing
     if(input$setsmooth=="yes1") {
-      dfx$Cases= f_rolling(dfx$Cases,7)
-      dfx$Deaths= f_rolling(dfx$Deaths,7)
+      dfx$Cases= roll_mean(dfx$Cases,14,align="center",fill=c("NA","NA","NA"))
+      dfx$Deaths= roll_mean(dfx$Deaths,14,align="center",fill=c("NA","NA","NA"))
       dfx$Cases= na.fill(dfx$Cases, "extend")
       dfx$Deaths= na.fill(dfx$Deaths, "extend")
     }
@@ -160,8 +161,8 @@ server <- function(input, output, session) {
     z=nrow(dfx) # determine the current number of rows
     # apply smoothing
     if(input$setsmooth=="yes1") {
-      dfx$Cases= f_rolling(dfx$Cases,7)
-      dfx$Deaths= f_rolling(dfx$Deaths,7)
+      dfx$Cases= roll_median(dfx$Cases,7,align="center",fill=c("NA","NA","NA"))
+      dfx$Deaths= roll_median(dfx$Deaths,7,align="center",fill=c("NA","NA","NA"))
       dfx$Cases= na.fill(dfx$Cases, "extend")
       dfx$Deaths= na.fill(dfx$Deaths, "extend")
     }
@@ -227,7 +228,7 @@ server <- function(input, output, session) {
       ggtitle(setcountry) +
       o1 + o2 + o3 + o4 
     
-    return(grid.arrange(p1,p2,ncol=1))
+    return(grid.arrange(p1,p2,ncol=1,widths=c(.5),heights=c(1,1)))
   })
   
 
